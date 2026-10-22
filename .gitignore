@@ -1,0 +1,11 @@
+# Caché de Python
+__pycache__/
+
+# Respaldos automáticos de Jupyter
+.ipynb_checkpoints/
+
+# Archivos comprimidos generados por comprimir.py
+*.tp2
+
+# Archivos de sistema de macOS
+.DS_Store
