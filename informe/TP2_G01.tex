@@ -88,61 +88,51 @@
 
 % =====================================================================
 \section*{Resumen}
-En este trabajo se comprimen tres imágenes en escala de grises con el código de Huffman y se compara
-el resultado de codificar directamente cada píxel con el de codificar la diferencia entre píxeles
-vecinos. Para cada imagen se estima la masa de probabilidad de las intensidades y de los residuos,
-se calculan sus entropías y se verifica que la longitud media del código de Huffman queda entre la
-entropía y la entropía más un bit. La codificación diferencial más que duplica la compresión en la
-imagen más suave y la mejora en la segunda, pero resulta peor que la codificación directa en una
-textura de arena. La información mutua entre píxeles vecinos explica estas diferencias: mide la
-redundancia espacial que el esquema diferencial puede aprovechar, y es casi nula en la textura.
-Por último se implementan dos programas de línea de comando que comprimen una imagen a un archivo
-binario y la recuperan sin pérdida.
+Se comparan dos formas de comprimir tres imágenes en escala de grises con Huffman: codificar las
+intensidades y codificar las diferencias entre píxeles vecinos. Se estiman sus distribuciones,
+entropías e información mutua, y se comprueba que los bits promedio medidos coinciden con la
+longitud media calculada. Los residuos mejoran la compresión de las dunas y la partitura, pero
+empeoran la de la textura de arena. Como control adicional, se barajan los píxeles de las dunas:
+la codificación directa cuesta lo mismo, mientras que la de residuos pierde su ventaja. También se
+implementan un compresor y un descompresor de archivos binarios.
 
 % =====================================================================
 \section{Introducción}
 % =====================================================================
-Una imagen en escala de grises de 8 bits es una matriz de enteros entre 0 y 255, y guardarla
-``tal cual'' cuesta 8 bits por píxel sin importar qué tan frecuente sea cada intensidad. La teoría de
-la información dice que eso es un desperdicio siempre que algunas intensidades sean más comunes que
-otras: un código que asigne palabras cortas a los símbolos frecuentes y largas a los raros necesita,
-en promedio, menos bits por símbolo. La entropía de la fuente marca cuánto se puede ahorrar como
-máximo, y el algoritmo de Huffman construye el código libre de prefijo que más se acerca a ese límite.
+Una imagen en escala de grises de 8 bits almacena cada intensidad con la misma cantidad de bits.
+Cuando los niveles aparecen con frecuencias diferentes, un código de longitud variable puede reducir
+el promedio de bits por píxel. Huffman permite construir un código libre de prefijo que minimiza ese
+promedio para una distribución dada.
 
-Hay, sin embargo, una segunda fuente de ahorro que la codificación símbolo a símbolo no ve. En una
-imagen los píxeles vecinos suelen parecerse, así que la diferencia entre un píxel y el anterior es
-casi siempre pequeña y, por lo tanto, mucho más predecible que el valor absoluto del píxel. Codificar
-esas diferencias (residuos) en lugar de las intensidades puede reducir la entropía cuando el predictor
-aprovecha esa dependencia, sin perder información, porque la imagen se recupera sumando los residuos.
-
-Los objetivos del trabajo son: (i) estimar empíricamente la masa de probabilidad de las intensidades
-de cada imagen, calcular su entropía y comprimir con Huffman, verificando la cota teórica sobre la
-longitud media del código; (ii) repetir el análisis sobre los residuos entre píxeles vecinos y
-cuantificar la mejora; (iii) estimar la información mutua entre píxeles vecinos y usarla para
-explicar las diferencias entre imágenes y entre esquemas; y (iv) implementar un compresor y un
-descompresor de línea de comando basados en Huffman sobre residuos.
+El objetivo del trabajo es comparar esa codificación directa con la de los residuos entre vecinos.
+En regiones suaves, las diferencias pequeñas son frecuentes y pueden necesitar menos bits que las
+intensidades. Se estudian tres imágenes para comprobar cuándo ocurre esta mejora y relacionarla con
+la dependencia espacial mediante información mutua. En ambos esquemas se verifica la recuperación
+exacta de la imagen en escala de grises.
 
 % =====================================================================
 \section{Marco teórico y metodología}
 % =====================================================================
 \paragraph{Entropía y código de Huffman.}
 Sea $X$ una fuente discreta con masa de probabilidad $p(x)$. Su entropía en bits,
-$H(X) = -\sum_x p(x)\log_2 p(x)$, es la cota inferior de la longitud media de cualquier código sin
-pérdida~\cite{shannon,cover}. Un código asigna a cada símbolo una palabra de $l(x)$ bits y su
+$H(X) = -\sum_x p(x)\log_2 p(x)$, es una cota inferior de la longitud media de un código binario
+símbolo a símbolo unívocamente decodificable~\cite{shannon,cover}. Aquí $H(X)$ es marginal: para
+aprovechar la dependencia entre píxeles se necesita otra representación o un modelo con contexto. Un código asigna a cada símbolo una palabra de $l(x)$ bits y su
 longitud media es $L = \sum_x p(x)\,l(x)$. El algoritmo de Huffman~\cite{huffman} construye el
 código libre de prefijo de menor $L$ para una pmf dada. Con al menos dos símbolos de probabilidad
 positiva cumple $H(X) \le L < H(X) + 1$. En general no alcanza exactamente la entropía porque las
 longitudes son enteras; sí la alcanza para probabilidades diádicas $p(x)=2^{-l(x)}$. Por ejemplo,
 dos símbolos equiprobables tienen $H=L=1$. Si hay un único símbolo, nuestra implementación usa la
 palabra \texttt{0} para conservar la cantidad de ocurrencias al decodificar con la función provista:
-entonces $H=0$ y $L=1$, una excepción a la cota estricta por la convención de palabra no vacía. Con una fuente de $M$ símbolos usados vale además $H(X) \le \log_2 M$, con igualdad
+entonces $H=0$ y $L=1$, una excepción a la cota estricta por la convención de palabra no vacía.
+Con una fuente de $M$ símbolos usados vale además $H(X)\le\log_2 M$, con igualdad
 solo si son equiprobables.
 
 \paragraph{Estimación empírica.}
 Tratamos cada píxel como una realización de la fuente $X$ y estimamos la pmf por frecuencia
 relativa, $\hat p(x) = n_x / N$, donde $n_x$ es la cantidad de píxeles con intensidad $x$ y $N$ el
-total de píxeles. Es el histograma de 256 bins normalizado y el estimador de máxima verosimilitud de
-la pmf~\cite{teoricas}. Todas las entropías del trabajo se calculan sobre estas estimaciones, sumando
+total de píxeles. Es el histograma de 256 bins normalizado; bajo un modelo categórico i.i.d. coincide
+con el estimador de máxima verosimilitud de la pmf~\cite{teoricas}. Todas las entropías del trabajo se calculan sobre estas estimaciones, sumando
 solo sobre los símbolos con $\hat p(x) > 0$.
 
 \paragraph{Codificación diferencial.}
@@ -204,8 +194,8 @@ original. Las cifras citadas en este informe son las que imprime el cuaderno.
 \paragraph{Masa de probabilidad y entropía (inciso a).}
 La fila superior de la Figura~\ref{fig:pmf} muestra $\hat p(x)$ para cada imagen y la
 Tabla~\ref{tab:ej1} resume las entropías. Las tres imágenes usan una cantidad parecida de niveles de
-gris (entre 205 y 228 de los 256 posibles), de modo que la cota $\log_2 M \approx 7.7$ bits es
-casi la misma para todas; la diferencia de entropía está en cómo se reparte la masa dentro de ese
+gris (entre 205 y 228 de los 256 posibles), con cotas $\log_2 M$ entre 7.68 y 7.83 bits;
+ la diferencia de entropía está en cómo se reparte la masa dentro de ese
 rango. \img{01} tiene un pico muy marcado alrededor de 165 (el tono de la arena de las dunas) y
 otro menor en 100, con poca masa fuera de ellos, y por eso su entropía es la más baja. \img{02} usa
 menos niveles pero los reparte de forma acampanada y bastante pareja entre 120 y 240. \img{04}
@@ -239,8 +229,8 @@ apenas 0.03 bits, muy por debajo del bit de margen que garantiza la cota.
 
 La compresión frente a los 8 bits por píxel es modesta: la tasa $8/L$ va de 1.12 a 1.27, es decir,
 un ahorro de entre el 11\,\% y el 21\,\%. Como Huffman ya está prácticamente en el límite $H(X)$,
-ningún código símbolo a símbolo puede hacerlo mucho mejor sobre esta fuente. Para comprimir más
-hace falta cambiar la fuente, que es lo que hace la codificación diferencial.
+el margen para mejorar un código por intensidad es pequeño. La codificación diferencial del
+siguiente ejercicio permite aprovechar parte de la estructura espacial.
 
 \begin{figure}[H]
   \centering
@@ -274,18 +264,15 @@ Tabla~\ref{tab:ej2a} compara las entropías. El comportamiento no es el mismo en
   \end{tabular}
 \end{table}
 
-En \img{01} y \img{04} la pmf de los residuos es un pico angosto en $y = 0$ que decae rápido: el
-92\,\% y el 72\,\% de los residuos, respectivamente, caen en $|y| \le 5$. Por eso $H(Y)$ es bastante
+En \img{01} y \img{04} la pmf de los residuos se concentra alrededor de $y=0$: el
+92.5\,\% y el 71.9\,\% de los residuos, respectivamente, caen en $|y|\le5$. Por eso $H(Y)$ es bastante
 menor que $H(X)$, aun cuando el alfabeto de $Y$ (511 símbolos posibles, de los cuales aparecen entre
-230 y 311) es el doble de grande que el de $X$. Es la redundancia espacial: como los píxeles vecinos
+230 y 311) tiene casi el doble de símbolos que el de $X$. Es la redundancia espacial: como los píxeles vecinos
 tienen intensidades parecidas, su diferencia es pequeña y mucho más predecible que el valor absoluto.
 
-En \img{02} ocurre lo contrario: $H(Y)$ supera a $H(X)$. Solo el 13\,\% de los residuos cae en
-$|y| \le 5$ y $\hat p(y)$ es una campana ancha, de desvío comparable al de las intensidades. A escala
-de un píxel la arena se comporta como ruido: la intensidad de un píxel aporta poca información sobre
-la del vecino, y restar dos variables casi independientes no reduce la variabilidad sino que la
-amplifica, porque la diferencia tiene mayor dispersión que cada una por separado. La codificación
-diferencial solo ayuda cuando existe dependencia entre vecinos, lo que se cuantifica en el inciso (c).
+En \img{02} ocurre lo contrario: $H(Y)$ supera a $H(X)$. Solo el 13.4\,\% de los residuos cae en
+$|y|\le5$. Las diferencias están más repartidas y el predictor basado en el vecino anterior no
+reduce la entropía. En el inciso (c) se mide la dependencia entre esos mismos vecinos.
 
 \begin{figure}[H]
   \centering
@@ -300,8 +287,8 @@ Aplicamos el mismo procedimiento del Ejercicio~1 sobre la fuente $Y$, con alfabe
 $\{-255,\dots,255\}$. La Tabla~\ref{tab:ej2b} muestra que los bits promedio medidos vuelven a
 coincidir con la longitud media teórica $L_Y$ y que se cumple $H(Y) \le L_Y < H(Y) + 1$ en las tres
 imágenes. Para comparar de manera justa con el Ejercicio~1 contamos también los 8 bits del píxel
-inicial, que sobre toda la imagen son despreciables: el costo total por píxel coincide con $L_Y$ hasta
-la cuarta cifra decimal.
+inicial. El costo total por píxel es $(8+(MN-1)L_Y)/(MN)$; la diferencia con $L_Y$ es menor de
+0.00005 en estas imágenes. Las tablas y los demás metadatos se cuentan en el Ejercicio~4.
 
 \begin{table}[H]
   \centering
@@ -310,7 +297,7 @@ la cuarta cifra decimal.
   \label{tab:ej2b}
   \begin{tabular}{lrrrrrr}
     \toprule
-    Imagen & $H(Y)$ & $L_Y$ & Bits/píxel medidos & $L_X$ (Ej.~1) & Tasa píxel a píxel & Tasa residuos \\
+    Imagen & $H(Y)$ & $L_Y$ & Bits/res. medidos & $L_X$ & Tasa directa & Tasa residuos \\
     \midrule
     \img{01} & 2.826 & 2.840 & 2.840 & 6.310 & 1.27 & 2.82 \\
     \img{02} & 7.138 & 7.179 & 7.179 & 6.809 & 1.17 & 1.11 \\
@@ -325,29 +312,27 @@ palabras más cortas a los residuos más frecuentes. Para $|y|\le 5$, las longit
 en \img{01} y de 3 a 5 bits en \img{04}. En \img{02} la
 codificación de residuos es peor que la píxel a píxel ($L_Y = 7.18$ frente a $L_X = 6.81$), aunque
 sigue por debajo de 8 bits porque la pmf de los residuos conserva cierta concentración alrededor de
-cero. En todos los casos Huffman queda a menos de 0.05 bits de la entropía de la fuente que codifica:
-lo que cambia entre los dos esquemas no es el codificador sino la fuente.
+cero. En ambos esquemas la longitud media de Huffman queda a menos de 0.05 bits de la entropía.
+Las diferencias de compresión se explican principalmente por las distribuciones que se codifican.
 
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.78\textwidth]{barras_ej2}
   \caption{Entropía y longitud media del código de Huffman para las intensidades ($H(X)$, $L_X$) y
-  para los residuos ($H(Y)$, $L_Y$), frente a los 8 bits de la representación directa.}
+  para los residuos ($H(Y)$, $L_Y$), en bits por símbolo de cada fuente. La línea indica los 8 bits
+  por píxel de la representación directa.}
   \label{fig:barras}
 \end{figure}
 
 \subsection{Información mutua entre píxeles vecinos (inciso c)}
-La Figura~\ref{fig:conjunta} muestra la pmf conjunta $\hat p(x, x')$ de cada imagen en escala
-logarítmica (sin el logaritmo solo se vería la diagonal, porque la masa abarca varios órdenes de
-magnitud), y la Tabla~\ref{tab:ej2c} resume las cantidades de información. La diagonal $x = x'$
-corresponde al residuo nulo, y la distancia a la diagonal es el valor del residuo, así que cada
-gráfico es a la vez una foto de la dependencia entre vecinos y de la distribución de residuos. Si
-$X$ y $X'$ fueran independientes, el mapa sería el producto de las dos marginales: una mancha sin
-estructura diagonal.
+La Figura~\ref{fig:conjunta} muestra la pmf conjunta $\hat p(x,x')$ en escala logarítmica para
+visualizar probabilidades de distintos órdenes de magnitud. La diagonal $x=x'$ corresponde al
+residuo nulo; las líneas $x-x'=y$ agrupan los pares que producen el mismo residuo. La
+Tabla~\ref{tab:ej2c} resume la información mutua y las entropías relacionadas.
 
 \begin{table}[H]
   \centering
-  \caption{Información mutua empírica entre píxeles vecinos y cantidades relacionadas, en bits.}
+  \caption{Entropías e información mutua empíricas en bits. El cociente $\MI/H(X)$ es adimensional.}
   \label{tab:ej2c}
   \begin{tabular}{lrrrrrrr}
     \toprule
@@ -368,63 +353,90 @@ estructura diagonal.
   \label{fig:conjunta}
 \end{figure}
 
-En \img{01} la masa se concentra en una diagonal fina y brillante, más intensa entre 100 y 190 (los
-tonos de la arena); los pocos puntos lejos de la diagonal son los bordes de los camellos. Conocer el
-vecino elimina el 59\,\% de la incerteza del píxel. En \img{04} la diagonal también es nítida y se
-extiende por todo el rango, con dos zonas densas: cerca de 0 a 30 (tinta seguida de tinta) y
-alrededor de 200 a 230 (fondo seguido de fondo); la nube alrededor es más ancha porque los bordes de
-las notas generan muchos pares con valores muy distintos, y $\MI$ es algo menor. En \img{02} no hay
-diagonal: la pmf conjunta es una mancha difusa centrada en $(180, 180)$, justo la forma del producto de
-las marginales, y $\MI$ es apenas 0.12 bits.
+En \img{01} la masa se concentra cerca de la diagonal, especialmente entre 100 y 190. La
+información mutua estimada es 3.72 bits y representa el 59\,\% de $H(X)$ para estos pares. En
+\img{04} también se observa la diagonal, pero con mayor dispersión; la reducción relativa es del
+39\,\%. Aun conociendo el vecino, quedan 2.56 y 4.36 bits de entropía condicional, respectivamente.
+En \img{02} la nube es más difusa y la información mutua estimada es mucho menor: 0.116 bits.
 
-En las tres imágenes se verifica $H(X) - H(Y) \le \MI$, como corresponde a $H(Y) \ge H(X \mid X')$.
-En las imágenes suaves los residuos capturan casi toda la información mutua: $H(Y)$ queda a 0.27 y
-0.51 bits de $H(X \mid X')$. En \img{02} la información mutua es pequeña pero positiva mientras que
-$H(X) - H(Y)$ es negativa: hay algo de dependencia, pero la resta $X - X'$ es una manera pobre de
-aprovecharla cuando la correlación es débil.
+En las tres imágenes se verifica $H(Y)\ge H(X\mid X')$. La diferencia es de 0.27 bits en
+\img{01} y de 0.51 en \img{04}: los residuos aprovechan buena parte de la dependencia entre estos
+vecinos. En \img{02}, en cambio, $H(X)-H(Y)<0$ y la resta empeora la compresión. Estos valores se
+estiman con histogramas finitos; una información mutua estimada positiva no basta por sí sola para
+afirmar dependencia de una fuente subyacente, ni un valor pequeño demuestra independencia.
 
 % =====================================================================
 \section{Ejercicio 3: interpretación de los resultados}
 % =====================================================================
 \paragraph{(a) Diferencias de entropía entre imágenes.}
-$H(X)$ depende únicamente de la forma de la pmf de intensidades: es máxima cuando los niveles usados
-son equiprobables y disminuye cuanto más concentrada está la masa en pocos niveles. Como las tres
-imágenes usan una cantidad similar de niveles, la diferencia no está en el rango sino en cuán
-repartida está la masa dentro de él. \img{01} tiene la entropía más baja porque la mayor parte de la
-imagen es arena de un tono similar y la pmf tiene un pico pronunciado; \img{02} reparte su masa de
-manera bastante pareja en una campana; \img{04} combina dos poblaciones bien separadas (fondo claro y
-tinta oscura) con transiciones entre ambas, lo que cubre casi todo el rango con una pmf relativamente
-plana y da la entropía más alta. La entropía refleja el contraste y la variedad tonal de la imagen,
-no su textura ni su estructura espacial, que la pmf de intensidades ignora por completo. Un ejemplo
-claro es \img{02}: tiene mucha variabilidad (entropía alta) pero, como se ve en el inciso siguiente,
-casi nada de ella es redundancia aprovechable.
+Las tres imágenes usan cantidades parecidas de niveles, pero con frecuencias distintas. En
+\img{01} predominan unos pocos tonos de las dunas; en \img{02} la masa se reparte en una campana
+más ancha; en \img{04} las intensidades están más repartidas y la entropía es la mayor.
+$H(X)$ depende de las probabilidades de los niveles, no de su separación ni del orden de los
+píxeles. Por eso no es una medida directa de contraste o textura: una permutación de las posiciones
+conserva exactamente el histograma y la entropía.
 
 \paragraph{(b) Qué representa la información mutua.}
-$\MI$ es la redundancia espacial de la imagen: la cantidad de bits de incerteza sobre un píxel que
-desaparecen al conocer su vecino. Para la codificación diferencial acota la reducción de entropía
-respecto del modelo marginal al usar ese vecino, porque la incertidumbre que queda
-una vez conocido $X'$ es $H(X \mid X') = H(X) - \MI$, y los residuos cumplen $H(Y) \ge H(X \mid X')$.
-En estas imágenes, la dependencia que aprovecha la resta está asociada a la suavidad a escala de un
-píxel; la información mutua mide dependencia en general, no necesariamente semejanza de intensidades: \img{01} es la más suave (regiones de dunas con variación
-gradual) y tiene la mayor $\MI$; \img{04} tiene regiones uniformes pero también muchos bordes de
-tinta que generan pares muy distintos, y su $\MI$ es menor; \img{02} es una textura de grano fino en
-la que la intensidad de un píxel casi no dice nada sobre la del vecino, y su $\MI$ es casi nula.
+$\MI$ cuantifica cuánto se reduce la incertidumbre sobre el píxel actual al conocer el vecino
+anterior del recorrido. En estas imágenes es mayor en las dunas, menor en la partitura y muy baja
+en la textura de arena. Las regiones suaves generan muchos pares próximos a la diagonal; los
+bordes y la textura dispersan esos pares. La información mutua mide dependencia en general, no
+necesariamente semejanza de intensidades. Tampoco describe toda la estructura espacial: aquí solo
+se consideran los vecinos de la serpentina.
 
 \paragraph{(c) Compresión píxel a píxel frente a compresión de residuos.}
-En ambos esquemas Huffman queda a menos de 0.05 bits de la entropía de la fuente que codifica, de
-modo que el codificador no es lo que cambia: lo que cambia es la fuente. La codificación píxel a píxel
-trata a cada píxel como independiente de los demás y su límite es $H(X)$, que no puede aprovechar la
-dependencia espacial. La codificación diferencial transforma la imagen en una fuente $Y$ cuya entropía
-puede ser menor que $H(X)$ cuando el predictor aprovecha la dependencia entre vecinos: en \img{01} e \img{04} la pmf de
-los residuos se concentra alrededor de cero y la tasa de compresión pasa de 1.27 a 2.82 y de 1.12 a
-1.63, con una ganancia $L_X - L_Y$ cercana a $\MI$. Cuando no hay dependencia, como en \img{02},
-restar dos píxeles casi independientes produce una variable con más dispersión que cada uno por
-separado, $H(Y) > H(X)$ y la codificación de residuos es peor que la directa. La diferencia entre
-ambos métodos depende de cuánto aprovecha la resta la estructura espacial. Una información mutua alta
-no garantiza una mejora: una secuencia alternante de intensidades 0 y 255 tiene dependencia casi
-perfecta entre vecinos, pero los residuos alternan $+255$ y $-255$ y ambos códigos usan un bit por
-símbolo. La identidad $H(X)-H(Y)=\MI-I(Y;X')$ explica por qué la dependencia disponible puede no
-traducirse en ahorro con este predictor.
+En las dunas y la partitura, los residuos pequeños son frecuentes y requieren menos bits en
+promedio que las intensidades. Las tasas de compresión pasan de 1.27 a 2.82 y de 1.12 a 1.63.
+En la textura de arena ocurre lo contrario: los residuos requieren 7.18 bits por símbolo frente
+a los 6.81 de las intensidades, por lo que conviene la codificación directa.
+
+La desigualdad $H(Y)\ge H(X\mid X')$ acota la mejora posible, pero una información mutua alta no
+la garantiza. Una secuencia alternante 0,255,0,255 tiene dependencia casi perfecta y residuos que
+alternan $+255$ y $-255$; ambos códigos usan un bit por símbolo. La identidad
+$H(X)-H(Y)=\MI-I(Y;X')$ muestra que el ahorro depende de cuánto aprovecha la resta la dependencia
+disponible. Para comparar longitudes Huffman se suman además las redundancias de los códigos.
+
+% =====================================================================
+\section{Curiosidad: barajar los píxeles}
+% =====================================================================
+Para distinguir el efecto del histograma del efecto del orden espacial, permutamos los píxeles de
+\img{01} sin cambiar sus valores ni las dimensiones. Usamos una semilla fija (42) y repetimos los
+cálculos sobre los vecinos de la nueva serpentina. Se comprobó que los histogramas y la cantidad de
+bits de la codificación directa son exactamente iguales. La permutación se analiza como una imagen
+nueva, sin proponerla como transformación del compresor.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\textwidth]{barajado}
+  \caption{La imagen de dunas y una permutación de sus píxeles. Las frecuencias de las intensidades
+  se conservan, pero se pierde la continuidad espacial.}
+  \label{fig:barajado}
+\end{figure}
+
+\begin{table}[H]
+  \centering
+  \caption{Control de barajado. $L_X$ está en bits por píxel y $L_Y$ en bits por residuo;
+  las entropías y la información mutua, en bits.}
+  \label{tab:barajado}
+  \begin{tabular}{lrrrrr}
+    \toprule
+    Versión & $H(X)$ & $L_X$ & $H(Y)$ & $L_Y$ & $\MI$ \\
+    \midrule
+    Original & 6.2809 & 6.3100 & 2.8262 & 2.8402 & 3.7217 \\
+    Barajada & 6.2809 & 6.3100 & 7.3711 & 7.3995 & 0.1055 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+La codificación directa cuesta lo mismo porque solo utiliza las frecuencias de las intensidades.
+En cambio, al barajar se pierde la continuidad de las dunas y aparecen diferencias grandes entre
+vecinos con más frecuencia. La longitud media de los residuos sube de 2.84 a 7.40 bits y supera
+los 6.31 bits por píxel de la codificación directa. El control muestra que la ventaja original de
+los residuos depende de la disposición espacial, que el histograma de intensidades no registra.
+
+La información mutua estimada baja mucho, pero no llega exactamente a cero. Se trata de una sola
+permutación de un conjunto finito evaluada con histogramas empíricos. El experimento es ilustrativo
+y no constituye una prueba estadística de independencia.
 
 % =====================================================================
 \section{Ejercicio 4: compresor y descompresor de línea de comando}
@@ -440,9 +452,9 @@ las dimensiones (dos enteros de 32 bits), el píxel inicial (1 byte), la cantida
 tabla (2 bytes), la tabla propiamente dicha (por cada residuo que aparece, su valor en 2 bytes y la
 longitud de su palabra de código en 1 byte), la cantidad de bits útiles (8 bytes) y, por último, un
 único flujo de bits con las palabras de código concatenadas en el orden de la tabla seguidas de los
-residuos codificados, completado con ceros hasta el byte. Guardar solo las longitudes y reconstruir el
-diccionario a partir del flujo de bits hace que la tabla ocupe 3 bytes por símbolo; el encabezado
-completo pesa alrededor de 1\,KB, despreciable frente a los datos.
+residuos codificados, completado con ceros hasta el byte. Cada entrada fija de la tabla ocupa
+3 bytes; las palabras de código también se guardan, al comienzo del flujo de bits. Incluyendo esas
+palabras, los metadatos ocupan aproximadamente entre 1.1 y 1.4\,KB en estas imágenes.
 
 \begin{table}[H]
   \centering
@@ -461,42 +473,25 @@ completo pesa alrededor de 1\,KB, despreciable frente a los datos.
   \end{tabular}
 \end{table}
 
-Los bits por píxel coinciden con los del Ejercicio~2 y las tasas son apenas menores por el
-encabezado. Verificamos con el descompresor que las tres reconstrucciones son idénticas a las
+Los valores coinciden con los del Ejercicio~2 a la precisión mostrada. Las tasas del archivo son
+algo menores porque incluyen todos los metadatos. Verificamos que las tres reconstrucciones son idénticas a las
 originales en escala de grises. Para \img{02} el programa comprime, pero un compresor que probara
 ambos esquemas y guardara en el encabezado cuál usó obtendría un archivo más chico codificando las
 intensidades directamente.
 
 % =====================================================================
 \section{Conclusiones}
-% =====================================================================
-El código de Huffman se comportó en todos los casos como predice la teoría: la longitud media medida
-sobre la cadena comprimida coincidió con $L = \sum_x \hat p(x)\, l(x)$ y quedó entre la entropía de la
-fuente y la entropía más un bit, con una redundancia menor de 0.05 bits. Eso significa que, para
-una fuente dada, Huffman está prácticamente en el límite, y que la forma de comprimir más no es
-mejorar el codificador sino cambiar la fuente.
+Huffman produjo longitudes medias a menos de 0.05 bits de las entropías estimadas, y las cuentas
+teóricas coincidieron con los bits medidos. La codificación por residuos mejoró las tasas de las
+dunas y la partitura, pero empeoró la de la textura de arena. Por eso conviene evaluar el predictor
+sobre cada imagen: la dependencia entre vecinos no garantiza que la resta reduzca la entropía.
 
-La codificación diferencial es ese cambio de fuente, y su efecto depende de cómo el predictor
-aprovecha la dependencia espacial de la imagen. En la imagen suave de dunas la entropía bajó de 6.28 a 2.83 bits
-y la tasa de compresión subió de 1.27 a 2.82; en la partitura, de 1.12 a 1.63. En la textura de arena,
-en cambio, los residuos resultaron más dispersos que las intensidades y la compresión empeoró. Este
-último resultado nos sorprendió al principio, porque esperábamos que restar vecinos siempre ayudara;
-entenderlo exigió separar dos ideas que la intuición mezcla: la variabilidad de una imagen (su
-entropía) y su redundancia (la información mutua entre vecinos). Una imagen puede tener mucha de la
-primera y nada de la segunda. La información mutua fue la herramienta que ordenó el análisis: acota la
-reducción de entropía posible al usar ese vecino, resultó alta donde la codificación
-diferencial funcionó y casi nula donde falló, sin que una información mutua alta garantice por sí sola
-una mejora al restar, y la pmf conjunta permitió ver esa dependencia
-directamente como una diagonal más o menos nítida.
-
-Como extensiones naturales quedan usar predictores mejores que el vecino de la izquierda (el de
-arriba, el promedio de ambos o el predictor de Paeth que usa PNG~\cite{png}), estimar la información
-mutua con vecinos más lejanos para medir cuánta redundancia queda sin explotar, y comparar con una
-codificación condicional que se aproxime a $H(X \mid X')$ en lugar de $H(Y)$. Huffman condicionado no
-alcanza esa entropía en general: con palabra vacía en contextos deterministas y cantidad de símbolos
-conocida, cumple $H(X\mid X')\le L_{\mathrm{cond}}<H(X\mid X')+1$. Si se fuerza un bit en esos
-contextos, la cota superior general es no estricta. Para evaluar la compresión efectiva también hay
-que contar el costo de las tablas.
+El control de píxeles barajados permitió separar ambos efectos. El histograma y la compresión directa
+se conservaron, mientras que los residuos perdieron su ventaja al cambiar el orden espacial. En la
+implementación hubo que tratar por separado el caso de un único símbolo: asignarle la palabra
+\texttt{0} permitió conservar el número de ocurrencias con el decodificador provisto. Las tres
+imágenes originales se recuperaron exactamente desde los archivos \texttt{.tp2}. Como continuación
+se podría comparar la serpentina horizontal con una vertical, especialmente en la partitura.
 
 % =====================================================================
 {\small
@@ -514,8 +509,6 @@ que contar el costo de las tablas.
   \emph{Proceedings of the IRE}, 40(9), 1098--1101.
 \bibitem{cover} Cover, T. M. y Thomas, J. A. (2006). \emph{Elements of Information Theory} (segunda
   edición). Wiley. Capítulos 2 y 5.
-\bibitem{png} Boutell, T. et al. (1997). \emph{PNG (Portable Network Graphics) Specification},
-  RFC~2083, sección 6: filtros y predictor de Paeth.
 \end{thebibliography}
 }
 

@@ -9,6 +9,7 @@ Uso:
 """
 
 import argparse
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -20,11 +21,14 @@ from huffman_residuos import cargar_imagen_gris, leer_tp2
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("archivo", help="archivo .tp2 a descomprimir")
-    parser.add_argument("-o", "--salida", help="guardar la imagen reconstruida (png, jpg, ...)")
+    parser.add_argument("-o", "--salida", help="guardar sin pérdida (png, bmp, tif o tiff)")
     parser.add_argument("--verificar", metavar="ORIGINAL",
                         help="comparar la reconstrucción con la imagen original (en escala de grises)")
     parser.add_argument("--no-mostrar", action="store_true", help="no abrir la ventana con la imagen")
     args = parser.parse_args()
+
+    if args.salida and Path(args.salida).suffix.lower() not in {".png", ".bmp", ".tif", ".tiff"}:
+        parser.error("Usá PNG, BMP o TIFF para guardar la reconstrucción sin pérdida.")
 
     img = leer_tp2(args.archivo)
     print(f"Archivo:       {args.archivo}")

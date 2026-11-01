@@ -66,6 +66,8 @@ def reconstruir(inicial: int, residuos: np.ndarray, shape: tuple[int, int]) -> n
 
 def construir_codigo(residuos: np.ndarray) -> dict[int, str]:
     """Estima p(y) por frecuencia relativa y construye el código de Huffman."""
+    if residuos.size == 0:  # imagen de un píxel: alcanza con el inicial
+        return {}
     simbolos, conteos = np.unique(residuos, return_counts=True)
     prob = {int(s): float(c) / residuos.size for s, c in zip(simbolos, conteos)}
     if len(prob) == 1:  # caso degenerado: un único símbolo, huffman_code devolvería ''

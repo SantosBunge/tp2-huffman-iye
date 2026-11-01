@@ -7,7 +7,7 @@ codificación píxel a píxel con la codificación diferencial mediante residuos
 
 | Archivo | Contenido |
 |---|---|
-| `resolucion.ipynb` | Cuaderno con los ejercicios 1, 2 y 3: estimación de $p(x)$ y $p(y)$, entropías, compresión Huffman, información mutua y respuestas conceptuales. |
+| `resolucion.ipynb` | Ejercicios 1, 2 y 3, respuestas conceptuales y un control adicional con píxeles barajados. Al ejecutarlo se guardan las figuras del informe. |
 | `funciones_auxiliares_tp2.py` | Funciones provistas por la cátedra: `huffman_code` (construye el código a partir de las probabilidades) y `huffman_decode`. |
 | `huffman_residuos.py` | Lógica compartida del ejercicio 4: recorrido en serpentina, cálculo y reconstrucción de residuos, codificación, empaquetado de bits y lectura/escritura del formato `.tp2`. |
 | `comprimir.py` | Programa de línea de comando que comprime una imagen a `.tp2`. |
@@ -19,10 +19,10 @@ Las imágenes `img_XX.jpg` no forman parte de la entrega.
 
 ## Requisitos
 
-Python 3.10 o superior con `numpy`, `matplotlib` y `pillow`:
+Python 3.10 o superior con `numpy`, `matplotlib`, `pillow` y Jupyter para abrir el cuaderno:
 
 ```bash
-pip install numpy matplotlib pillow
+pip install numpy matplotlib pillow jupyter
 ```
 
 ## Cuaderno (ejercicios 1 a 3)
@@ -30,6 +30,9 @@ pip install numpy matplotlib pillow
 Abrir `resolucion.ipynb` con Jupyter y ejecutar todas las celdas en orden. Las imágenes
 deben estar en la misma carpeta que el cuaderno. Las funciones de los primeros ejercicios
 (`estimar_probabilidad`, `entropia`, `comprimir_huffman`, etc.) se reutilizan en los siguientes.
+El apartado de barajado usa la semilla 42 y conserva exactamente el histograma de `img_01`.
+Las figuras se actualizan en `informe/figures/`, en PDF y PNG. Para recompilar el informe,
+ejecutar `pdflatex TP2_G01.tex` dos veces desde `informe/`, o usar `tectonic TP2_G01.tex`.
 
 ## Ejercicio 4: programas de línea de comando
 
@@ -65,6 +68,8 @@ python descomprimir.py img_01.tp2 --no-mostrar               # no abre la ventan
 
 `--verificar` informa si la reconstrucción es idéntica, píxel a píxel, a la imagen original
 convertida a escala de grises.
+La salida opcional admite PNG, BMP o TIFF para conservar los píxeles. Se rechaza JPEG porque
+volvería a introducir pérdidas al guardar.
 
 ### Cómo funciona
 
@@ -90,8 +95,8 @@ convertida a escala de grises.
 | n_bits | 8 B | cantidad de bits útiles del bitstream |
 | bitstream | resto | los n códigos concatenados, luego los residuos codificados |
 
-El encabezado completo ocupa alrededor de 1 KB para una imagen típica, despreciable frente a
-los datos.
+Incluyendo las palabras de código, los metadatos ocupan aproximadamente entre 1.1 y 1.4 KB
+en las imágenes provistas. El tamaño `.tp2` de la tabla siguiente incluye ese costo.
 
 ## Resultados sobre las imágenes provistas
 
@@ -102,3 +107,15 @@ los datos.
 | img_04 | 4.89 | 72 128 B | 45 543 B | 1.58 |
 
 Las tres reconstrucciones son idénticas a las originales en escala de grises.
+
+## Verificación
+
+Desde la carpeta del cuaderno:
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+Se comprueban fuentes de un solo símbolo, residuos constantes, imágenes de un píxel y
+exportación sin pérdida. El cuaderno también verifica cada decodificación y la conservación
+del histograma y de los bits directos en el experimento de barajado.
