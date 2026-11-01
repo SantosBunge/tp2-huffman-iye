@@ -27,7 +27,7 @@ def main() -> None:
     img = cargar_imagen_gris(args.imagen)
     stats = escribir_tp2(salida, img)
 
-    bytes_original = img.size            # 8 bits por píxel en escala de grises
+    bytes_original = img.size
     bytes_tp2 = os.path.getsize(salida)
     print(f"Imagen:        {args.imagen}  ({img.shape[0]}x{img.shape[1]} px, escala de grises)")
     print(f"Salida:        {salida}")

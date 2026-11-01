@@ -28,13 +28,9 @@ from funciones_auxiliares_tp2 import huffman_code, huffman_decode
 
 MAGIC = b"TP2\x01"
 
-
-# ---------------------------------------------------------------- imagen <-> residuos
-
 def cargar_imagen_gris(path: str) -> np.ndarray:
     """Abre una imagen en cualquier formato estándar y la devuelve en escala de grises uint8."""
     return np.array(Image.open(path).convert("L"), dtype=np.uint8)
-
 
 def serpentina(img: np.ndarray) -> np.ndarray:
     """Aplana la imagen recorriéndola en serpentina (filas impares de derecha a izquierda)."""
@@ -42,45 +38,35 @@ def serpentina(img: np.ndarray) -> np.ndarray:
     s[1::2] = s[1::2, ::-1]
     return s.ravel()
 
-
 def deshacer_serpentina(seq: np.ndarray, shape: tuple[int, int]) -> np.ndarray:
     """Inversa de serpentina."""
     img = seq.reshape(shape).copy()
     img[1::2] = img[1::2, ::-1]
     return img
 
-
 def calcular_residuos(img: np.ndarray) -> tuple[int, np.ndarray]:
     """Devuelve el píxel inicial y los residuos y_k = x_k - x_{k-1} sobre la serpentina."""
     seq = serpentina(img).astype(np.int64)
     return int(seq[0]), np.diff(seq)
-
 
 def reconstruir(inicial: int, residuos: np.ndarray, shape: tuple[int, int]) -> np.ndarray:
     """Suma acumulada de los residuos a partir del píxel inicial y deshace la serpentina."""
     seq = np.concatenate([[inicial], residuos]).cumsum()
     return deshacer_serpentina(seq, shape).astype(np.uint8)
 
-
-# ---------------------------------------------------------------- Huffman
-
 def construir_codigo(residuos: np.ndarray) -> dict[int, str]:
     """Estima p(y) por frecuencia relativa y construye el código de Huffman."""
-    if residuos.size == 0:  # imagen de un píxel: alcanza con el inicial
+    if residuos.size == 0: 
         return {}
     simbolos, conteos = np.unique(residuos, return_counts=True)
     prob = {int(s): float(c) / residuos.size for s, c in zip(simbolos, conteos)}
-    if len(prob) == 1:  # caso degenerado: un único símbolo, huffman_code devolvería ''
+    if len(prob) == 1:  
         return {next(iter(prob)): "0"}
     return huffman_code(prob)
-
 
 def codificar(simbolos: np.ndarray, codigo: dict[int, str]) -> str:
     """Concatena las palabras de código de cada símbolo."""
     return "".join(codigo[int(s)] for s in simbolos)
-
-
-# ---------------------------------------------------------------- bits <-> bytes
 
 def bits_a_bytes(bits: str) -> bytes:
     """Empaqueta una cadena de '0'/'1' en bytes, completando el último con ceros."""
@@ -92,9 +78,6 @@ def bytes_a_bits(data: bytes, n_bits: int) -> str:
     """Desempaqueta bytes a una cadena de '0'/'1' de longitud n_bits."""
     arr = np.unpackbits(np.frombuffer(data, dtype=np.uint8))[:n_bits]
     return (arr + ord("0")).astype(np.uint8).tobytes().decode("ascii")
-
-
-# ---------------------------------------------------------------- archivo .tp2
 
 def escribir_tp2(path: str, img: np.ndarray) -> dict:
     """Comprime la imagen y escribe el archivo .tp2. Devuelve estadísticas."""
@@ -123,7 +106,6 @@ def escribir_tp2(path: str, img: np.ndarray) -> dict:
         "bits_por_pixel": len(bits_datos) / img.size,
     }
 
-
 def leer_tp2(path: str) -> np.ndarray:
     """Lee un archivo .tp2 y reconstruye la imagen en escala de grises."""
     with open(path, "rb") as f:
@@ -134,7 +116,6 @@ def leer_tp2(path: str) -> np.ndarray:
         (n_bits,) = struct.unpack(">Q", f.read(8))
         bitstream = bytes_a_bits(f.read(), n_bits)
 
-    # Reconstruir el diccionario de códigos a partir de las longitudes
     codigo, pos = {}, 0
     for simbolo, longitud in tabla:
         codigo[simbolo] = bitstream[pos:pos + longitud]
