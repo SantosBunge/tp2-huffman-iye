@@ -7,7 +7,7 @@ codificación píxel a píxel con la codificación diferencial mediante residuos
 
 | Archivo | Contenido |
 |---|---|
-| `resolucion.ipynb` | Ejercicios 1, 2 y 3, respuestas conceptuales y un control adicional con píxeles barajados. Al ejecutarlo se guardan las figuras del informe. |
+| `resolucion.ipynb` | Ejercicios 1, 2 y 3, respuestas conceptuales y un experimento adicional con píxeles mezclados. Al ejecutarlo se guardan las figuras del informe. |
 | `funciones_auxiliares_tp2.py` | Funciones provistas por la cátedra: `huffman_code` (construye el código a partir de las probabilidades) y `huffman_decode`. |
 | `huffman_residuos.py` | Lógica compartida del ejercicio 4: recorrido en serpentina, cálculo y reconstrucción de residuos, codificación, empaquetado de bits y lectura/escritura del formato `.tp2`. |
 | `comprimir.py` | Programa de línea de comando que comprime una imagen a `.tp2`. |
@@ -30,7 +30,7 @@ pip install numpy matplotlib pillow jupyter
 Abrir `resolucion.ipynb` con Jupyter y ejecutar todas las celdas en orden. Las imágenes
 deben estar en la misma carpeta que el cuaderno. Las funciones de los primeros ejercicios
 (`estimar_probabilidad`, `entropia`, `comprimir_huffman`, etc.) se reutilizan en los siguientes.
-El apartado de barajado usa la semilla 42 y conserva exactamente el histograma de `img_01`.
+El experimento de píxeles mezclados usa la semilla 42 y conserva exactamente el histograma de `img_01`.
 Las figuras se actualizan en `informe/figures/`, en PDF y PNG. Para recompilar el informe,
 ejecutar `pdflatex TP2_G01.tex` dos veces desde `informe/`, o usar `tectonic TP2_G01.tex`.
 
@@ -118,4 +118,4 @@ python -m unittest discover -s tests -v
 
 Se comprueban fuentes de un solo símbolo, residuos constantes, imágenes de un píxel y
 exportación sin pérdida. El cuaderno también verifica cada decodificación y la conservación
-del histograma y de los bits directos en el experimento de barajado.
+del histograma y de los bits directos en el experimento de píxeles mezclados.

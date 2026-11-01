@@ -92,7 +92,7 @@ Se comparan dos formas de comprimir tres imágenes en escala de grises con Huffm
 intensidades y codificar las diferencias entre píxeles vecinos. Se estiman sus distribuciones,
 entropías e información mutua, y se comprueba que los bits promedio medidos coinciden con la
 longitud media calculada. Los residuos mejoran la compresión de las dunas y la partitura, pero
-empeoran la de la textura de arena. Como control adicional, se barajan los píxeles de las dunas:
+empeoran la de la textura de arena. Como experimento adicional, se mezclan los píxeles de las dunas:
 la codificación directa cuesta lo mismo, mientras que la de residuos pierde su ventaja. También se
 implementan un compresor y un descompresor de archivos binarios.
 
@@ -182,8 +182,8 @@ original. Las cifras citadas en este informe son las que imprime el cuaderno.
   \centering
   \includegraphics[width=0.92\textwidth]{imagenes}
   \caption{Las tres imágenes en escala de grises, con sus dimensiones. \img{01}: dunas con camellos,
-  grandes regiones suaves. \img{02}: textura de arena de grano fino. \img{04}: partitura, fondo
-  uniforme con trazos oscuros.}
+  grandes regiones suaves. \img{02}: textura de arena de grano fino. \img{04}: partitura
+  fotografiada, con fondo claro de brillo gradual, zonas desenfocadas y trazos oscuros.}
   \label{fig:imagenes}
 \end{figure}
 
@@ -398,7 +398,7 @@ $H(X)-H(Y)=\MI-I(Y;X')$ muestra que el ahorro depende de cuánto aprovecha la re
 disponible. Para comparar longitudes Huffman se suman además las redundancias de los códigos.
 
 % =====================================================================
-\section{Curiosidad: barajar los píxeles}
+\section{Experimento adicional: píxeles mezclados}
 % =====================================================================
 Para distinguir el efecto del histograma del efecto del orden espacial, permutamos los píxeles de
 \img{01} sin cambiar sus valores ni las dimensiones. Usamos una semilla fija (42) y repetimos los
@@ -406,33 +406,33 @@ cálculos sobre los vecinos de la nueva serpentina. Se comprobó que los histogr
 bits de la codificación directa son exactamente iguales. La permutación se analiza como una imagen
 nueva, sin proponerla como transformación del compresor.
 
-\begin{figure}[H]
+\begin{figure}[!htbp]
   \centering
-  \includegraphics[width=0.85\textwidth]{barajado}
+  \includegraphics[width=0.85\textwidth]{mezclado}
   \caption{La imagen de dunas y una permutación de sus píxeles. Las frecuencias de las intensidades
   se conservan, pero se pierde la continuidad espacial.}
-  \label{fig:barajado}
+  \label{fig:mezclado}
 \end{figure}
 
-\begin{table}[H]
+\begin{table}[!htbp]
   \centering
-  \caption{Control de barajado. $L_X$ está en bits por píxel y $L_Y$ en bits por residuo;
+  \caption{Experimento con píxeles mezclados. $L_X$ está en bits por píxel y $L_Y$ en bits por residuo;
   las entropías y la información mutua, en bits.}
-  \label{tab:barajado}
+  \label{tab:mezclado}
   \begin{tabular}{lrrrrr}
     \toprule
     Versión & $H(X)$ & $L_X$ & $H(Y)$ & $L_Y$ & $\MI$ \\
     \midrule
     Original & 6.2809 & 6.3100 & 2.8262 & 2.8402 & 3.7217 \\
-    Barajada & 6.2809 & 6.3100 & 7.3711 & 7.3995 & 0.1055 \\
+    Mezclada & 6.2809 & 6.3100 & 7.3711 & 7.3995 & 0.1055 \\
     \bottomrule
   \end{tabular}
 \end{table}
 
 La codificación directa cuesta lo mismo porque solo utiliza las frecuencias de las intensidades.
-En cambio, al barajar se pierde la continuidad de las dunas y aparecen diferencias grandes entre
+En cambio, al mezclar se pierde la continuidad de las dunas y aparecen diferencias grandes entre
 vecinos con más frecuencia. La longitud media de los residuos sube de 2.84 a 7.40 bits y supera
-los 6.31 bits por píxel de la codificación directa. El control muestra que la ventaja original de
+los 6.31 bits por píxel de la codificación directa. El experimento muestra que la ventaja original de
 los residuos depende de la disposición espacial, que el histograma de intensidades no registra.
 
 La información mutua estimada baja mucho, pero no llega exactamente a cero. Se trata de una sola
@@ -487,7 +487,7 @@ teóricas coincidieron con los bits medidos. La codificación por residuos mejor
 dunas y la partitura, pero empeoró la de la textura de arena. Por eso conviene evaluar el predictor
 sobre cada imagen: la dependencia entre vecinos no garantiza que la resta reduzca la entropía.
 
-El control de píxeles barajados permitió separar ambos efectos. El histograma y la compresión directa
+El experimento con píxeles mezclados permitió separar ambos efectos. El histograma y la compresión directa
 se conservaron, mientras que los residuos perdieron su ventaja al cambiar el orden espacial. En la
 implementación hubo que tratar por separado el caso de un único símbolo: asignarle la palabra
 \texttt{0} permitió conservar el número de ocurrencias con el decodificador provisto. Las tres
